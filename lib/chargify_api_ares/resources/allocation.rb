@@ -25,6 +25,28 @@ module Chargify
       end
     end
 
+    def self.preview_prefix(opts = {})
+      subscription_id = opts[:subscription_id]
+      raise ArgumentError, 'subscription_id required' if subscription_id.nil?
+      "/subscriptions/#{subscription_id}/allocations/preview.#{format.extension}"
+    end
+
+    def self.preview(opts = {})
+      return [] if opts[:allocations].blank?
+
+      subscription_id = opts.delete(:subscription_id)
+      raise ArgumentError, 'subscription_id required' if subscription_id.nil?
+
+      with_json_format do |format|
+        response = connection.post(
+          preview_prefix(subscription_id: subscription_id),
+          format.encode(opts),
+          headers
+        )
+        instantiate_collection(format.decode(response.body))
+      end
+    end
+
     def self.with_json_format(&block)
       # Force json processing for this api request
       json_format = ActiveResource::Formats[:json]
