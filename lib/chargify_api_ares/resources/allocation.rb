@@ -6,7 +6,7 @@ module Chargify
       subscription_id = opts[:subscription_id]
       raise ArgumentError, 'subscription_id required' if subscription_id.nil?
 
-      "/subscriptions/#{subscription_id}/allocations.#{format.extension}"
+      "/subscriptions/#{subscription_id}/allocations.#{connection.format.extension}"
     end
 
     def self.bulk_create(opts = {})
@@ -15,20 +15,27 @@ module Chargify
       subscription_id = opts.delete(:subscription_id)
       raise ArgumentError, 'subscription_id required' if subscription_id.nil?
 
-      with_json_format do |format|
+      json_format = ActiveResource::Formats[:json]
+      orig_format = connection.format
+      begin
+        connection.format = json_format
+        format = json_format
         response = connection.post(
           bulk_create_prefix(subscription_id: subscription_id),
           format.encode(opts),
           headers
         )
         instantiate_collection(format.decode(response.body))
+      ensure
+        connection.format = orig_format
+        format = orig_format
       end
     end
 
     def self.preview_prefix(opts = {})
       subscription_id = opts[:subscription_id]
       raise ArgumentError, 'subscription_id required' if subscription_id.nil?
-      "/subscriptions/#{subscription_id}/allocations/preview.#{format.extension}"
+      "/subscriptions/#{subscription_id}/allocations/preview.#{connection.format.extension}"
     end
 
     def self.preview(opts = {})
@@ -37,25 +44,20 @@ module Chargify
       subscription_id = opts.delete(:subscription_id)
       raise ArgumentError, 'subscription_id required' if subscription_id.nil?
 
-      with_json_format do |format|
-        response = connection.post(
-          preview_prefix(subscription_id: subscription_id),
-          format.encode(opts),
-          headers
-        )
-        instantiate_collection(format.decode(response.body))
-      end
-    end
-
-    def self.with_json_format(&block)
-      # Force json processing for this api request
       json_format = ActiveResource::Formats[:json]
       orig_format = connection.format
       begin
         connection.format = json_format
-        block.call(json_format)
+        format = json_format
+        response = connection.post(
+          preview_prefix(subscription_id: subscription_id),
+          connection.format.encode(opts),
+          headers
+        )
+        instantiate_record(connection.format.decode(response.body))
       ensure
         connection.format = orig_format
+        format = orig_format
       end
     end
 
